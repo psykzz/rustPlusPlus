@@ -5,14 +5,40 @@ const Constants = require('../util/constants.js');
 
 module.exports = {
     getGuild: function (guildId) {
-        return Client.client.guilds.cache.get(guildId);
+        try {
+            return Client.client.guilds.cache.get(guildId);
+        }
+        catch (e) {
+            Client.client.log('ERROR', `Could not find guild: ${guildId}`, 'error');
+        }
+        return undefined;
+    },
+
+    getRole: function (guildId, roleId) {
+        let guild = module.exports.getGuild(guildId);
+
+        if (guild) {
+            try {
+                return guild.roles.cache.get(roleId);
+            }
+            catch (e) {
+                Client.client.log('ERROR', `Could not find role: ${roleId}`, 'error');
+            }
+        }
+        return undefined;
     },
 
     getTextChannelById: function (guildId, channelId) {
         const guild = module.exports.getGuild(guildId);
 
         if (guild) {
-            const channel = guild.channels.cache.get(channelId);
+            let channel = undefined;
+            try {
+                channel = guild.channels.cache.get(channelId);
+            }
+            catch (e) {
+                Client.client.log('ERROR', `Could not find channel: ${channelId}`, 'error');
+            }
 
             if (channel && channel.type === 'GUILD_TEXT') {
                 return channel;
@@ -25,7 +51,13 @@ module.exports = {
         const guild = module.exports.getGuild(guildId);
 
         if (guild) {
-            const channel = guild.channels.cache.find(c => c.name === name);
+            let channel = undefined;
+            try {
+                channel = guild.channels.cache.find(c => c.name === name);
+            }
+            catch (e) {
+                Client.client.log('ERROR', `Could not find channel: ${name}`, 'error');
+            }
 
             if (channel && channel.type === 'GUILD_TEXT') {
                 return channel;
@@ -38,7 +70,13 @@ module.exports = {
         const guild = module.exports.getGuild(guildId);
 
         if (guild) {
-            const category = guild.channels.cache.get(categoryId);
+            let category = undefined;
+            try {
+                category = guild.channels.cache.get(categoryId);
+            }
+            catch (e) {
+                Client.client.log('ERROR', `Could not find category: ${categoryId}`, 'error');
+            }
 
             if (category && category.type === 'GUILD_CATEGORY') {
                 return category;
@@ -51,7 +89,13 @@ module.exports = {
         const guild = module.exports.getGuild(guildId);
 
         if (guild) {
-            const category = guild.channels.cache.find(c => c.name === name);
+            let category = undefined;
+            try {
+                category = guild.channels.cache.find(c => c.name === name);
+            }
+            catch (e) {
+                Client.client.log('ERROR', `Could not find category: ${name}`, 'error');
+            }
 
             if (category && category.type === 'GUILD_CATEGORY') {
                 return category;
@@ -64,14 +108,14 @@ module.exports = {
         const guild = module.exports.getGuild(guildId);
 
         if (guild) {
-            const channel = guild.channels.cache.get(channelId);
+            const channel = module.exports.getTextChannelById(guildId, channelId);
 
             if (channel) {
                 try {
                     return await channel.messages.fetch(messageId);
                 }
                 catch (e) {
-                    return undefined;
+                    Client.client.log('ERROR', `Could not find message: ${messageId}`, 'error');
                 }
             }
         }
@@ -82,7 +126,13 @@ module.exports = {
         const guild = module.exports.getGuild(guildId);
 
         if (guild) {
-            const member = await Client.client.users.fetch(memberId);
+            let member = undefined;
+            try {
+                member = await Client.client.users.fetch(memberId);
+            }
+            catch (e) {
+                Client.client.log('ERROR', `Could not find member: ${memberId}`, 'error');
+            }
 
             if (member) {
                 return member;
@@ -95,28 +145,40 @@ module.exports = {
         const guild = module.exports.getGuild(guildId);
 
         if (guild) {
-            return await guild.channels.create(name, {
-                type: 'GUILD_CATEGORY',
-                permissionOverwrites: [{
-                    id: guild.roles.everyone.id,
-                    deny: [Permissions.FLAGS.SEND_MESSAGES]
-                }]
-            });
+            try {
+                return await guild.channels.create(name, {
+                    type: 'GUILD_CATEGORY',
+                    permissionOverwrites: [{
+                        id: guild.roles.everyone.id,
+                        deny: [Permissions.FLAGS.SEND_MESSAGES]
+                    }]
+                });
+            }
+            catch (e) {
+                Client.client.log('ERROR', `Could not create category: ${name}`, 'error');
+            }
         }
+        return undefined;
     },
 
     addTextChannel: async function (guildId, name) {
         const guild = module.exports.getGuild(guildId);
 
         if (guild) {
-            return await guild.channels.create(name, {
-                type: 'GUILD_TEXT',
-                permissionOverwrites: [{
-                    id: guild.roles.everyone.id,
-                    deny: [Permissions.FLAGS.SEND_MESSAGES]
-                }],
-            });
+            try {
+                return await guild.channels.create(name, {
+                    type: 'GUILD_TEXT',
+                    permissionOverwrites: [{
+                        id: guild.roles.everyone.id,
+                        deny: [Permissions.FLAGS.SEND_MESSAGES]
+                    }],
+                });
+            }
+            catch (e) {
+                Client.client.log('ERROR', `Could not create text channel: ${name}`, 'error');
+            }
         }
+        return undefined;
     },
 
     clearTextChannel: async function (guildId, channelId, numberOfMessages) {
@@ -124,16 +186,28 @@ module.exports = {
 
         if (channel) {
             for (let messagesLeft = numberOfMessages; messagesLeft > 0; messagesLeft -= 100) {
-                if (messagesLeft >= 100) {
-                    await channel.bulkDelete(100, true);
+                try {
+                    if (messagesLeft >= 100) {
+                        await channel.bulkDelete(100, true);
+                    }
+                    else {
+                        await channel.bulkDelete(messagesLeft, true);
+                    }
                 }
-                else {
-                    await channel.bulkDelete(messagesLeft, true);
+                catch (e) {
+                    Client.client.log('ERROR', `Could not perform bulkDelete on channel: ${channelId}`, 'error');
                 }
             }
 
             /* Fix for messages older than 14 days */
-            let messages = await channel.messages.fetch({ limit: 100 });
+            let messages = [];
+            try {
+                messages = await channel.messages.fetch({ limit: 100 });
+            }
+            catch (e) {
+                Client.client.log('ERROR', `Could not perform messages fetch on channel: ${channelId}`, 'error');
+            }
+
             for (let message of messages) {
                 message = message[1];
                 if (!message.author.bot) {
@@ -144,7 +218,7 @@ module.exports = {
                     await message.delete();
                 }
                 catch (e) {
-
+                    Client.client.log('ERROR', 'Could not perform message delete', 'error');
                 }
             }
         }
@@ -161,15 +235,6 @@ module.exports = {
                     .setCustomId(`${setting}InGameNotification`)
                     .setLabel('IN-GAME')
                     .setStyle((inGameActive) ? 'SUCCESS' : 'DANGER'))
-    },
-
-    getTrademarkButton: function (enabled) {
-        return new MessageActionRow()
-            .addComponents(
-                new MessageButton()
-                    .setCustomId('showTrademark')
-                    .setLabel((enabled) ? 'SHOWING' : 'NOT SHOWING')
-                    .setStyle((enabled) ? 'SUCCESS' : 'DANGER'))
     },
 
     getInGameCommandsEnabledButton: function (enabled) {
@@ -212,13 +277,17 @@ module.exports = {
                     .setStyle((enabled) ? 'SUCCESS' : 'DANGER'))
     },
 
-    getUpdateMapInformationButton: function (enabled) {
+    getTrackerNotifyButtons: function (allOffline, anyOnline) {
         return new MessageActionRow()
             .addComponents(
                 new MessageButton()
-                    .setCustomId('updateMapInformation')
-                    .setLabel((enabled) ? 'ENABLED' : 'DISABLED')
-                    .setStyle((enabled) ? 'SUCCESS' : 'DANGER'))
+                    .setCustomId('trackerNotifyAllOffline')
+                    .setLabel('ALL OFFLINE')
+                    .setStyle((allOffline) ? 'SUCCESS' : 'DANGER'),
+                new MessageButton()
+                    .setCustomId('trackerNotifyAnyOnline')
+                    .setLabel('ANY ONLINE')
+                    .setStyle((anyOnline) ? 'SUCCESS' : 'DANGER'));
     },
 
     getPrefixSelectMenu: function (currentPrefix) {
@@ -247,14 +316,46 @@ module.exports = {
             );
     },
 
+    getTrademarkSelectMenu: function (currentTrademark) {
+        return new MessageActionRow()
+            .addComponents(
+                new MessageSelectMenu()
+                    .setCustomId('trademark')
+                    .setPlaceholder(`${currentTrademark}`)
+                    .addOptions([
+                        {
+                            label: 'rustPlusPlus',
+                            description: 'rustPlusPlus will be shown before messages.',
+                            value: 'rustPlusPlus',
+                        },
+                        {
+                            label: 'Rust++',
+                            description: 'Rust++ will be shown before messages.',
+                            value: 'Rust++',
+                        },
+                        {
+                            label: 'NOT SHOWING',
+                            description: 'Not showing any trademark before messages.',
+                            value: 'NOT SHOWING',
+                        },
+                    ])
+            );
+    },
+
     getServerEmbed: function (guildId, id) {
         const instance = Client.client.readInstanceFile(guildId);
 
-        return new MessageEmbed()
+        let embed = new MessageEmbed()
             .setTitle(`${instance.serverList[id].title}`)
             .setColor('#ce412b')
             .setDescription(`${instance.serverList[id].description}`)
             .setThumbnail(`${instance.serverList[id].img}`);
+
+        if (instance.serverList[id].connect !== null) {
+            embed.addField('Connect', `\`${instance.serverList[id].connect}\``, true);
+        }
+
+        return embed;
     },
 
     getServerButtons: function (guildId, id, state = null) {
@@ -269,42 +370,62 @@ module.exports = {
         let style = null;
 
         switch (state) {
-            case 0: /* CONNECT */
+            case 0: { /* CONNECT */
                 customId = `${id}ServerConnect`;
                 label = 'CONNECT';
                 style = 'PRIMARY';
-                break;
+            } break;
 
-            case 1: /* DISCONNECT */
+            case 1: { /* DISCONNECT */
                 customId = `${id}ServerDisconnect`;
                 label = 'DISCONNECT';
                 style = 'DANGER';
-                break;
+            } break;
 
-            case 2: /* RECONNECTING */
+            case 2: { /* RECONNECTING */
                 customId = `${id}ServerReconnecting`;
                 label = 'RECONNECTING...';
                 style = 'DANGER';
-                break;
+            } break;
 
-            default:
-                break;
+            default: {
+            } break;
         }
 
-        return new MessageActionRow()
-            .addComponents(
-                new MessageButton()
-                    .setCustomId(customId)
-                    .setLabel(label)
-                    .setStyle(style),
-                new MessageButton()
-                    .setStyle('LINK')
-                    .setLabel('WEBSITE')
-                    .setURL(instance.serverList[id].url),
-                new MessageButton()
-                    .setCustomId(`${id}ServerDelete`)
-                    .setEmoji('🗑️')
-                    .setStyle('SECONDARY'))
+        let trackerAvailable = (instance.serverList[id].battlemetricsId !== null) ? true : false;
+
+        let connectionButton = new MessageButton()
+            .setCustomId(customId)
+            .setLabel(label)
+            .setStyle(style);
+        let trackerButton = new MessageButton()
+            .setCustomId(`${id}CreateTracker`)
+            .setLabel('CREATE TRACKER')
+            .setStyle('PRIMARY');
+        let linkButton = new MessageButton()
+            .setStyle('LINK')
+            .setLabel('WEBSITE')
+            .setURL(instance.serverList[id].url);
+        let deleteButton = new MessageButton()
+            .setCustomId(`${id}ServerDelete`)
+            .setEmoji('🗑️')
+            .setStyle('SECONDARY');
+
+        if (trackerAvailable) {
+            return new MessageActionRow()
+                .addComponents(
+                    connectionButton,
+                    trackerButton,
+                    linkButton,
+                    deleteButton);
+        }
+        else {
+            return new MessageActionRow()
+                .addComponents(
+                    connectionButton,
+                    linkButton,
+                    deleteButton);
+        }
     },
 
     sendServerMessage: async function (guildId, id, state = null, e = true, c = true, interaction = null) {
@@ -322,12 +443,7 @@ module.exports = {
         }
 
         if (interaction) {
-            try {
-                await interaction.update(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `Unknown interaction`, 'error');
-            }
+            await Client.client.interactionUpdate(interaction, content);
             return;
         }
 
@@ -338,13 +454,7 @@ module.exports = {
         }
 
         if (message !== undefined) {
-            try {
-                await message.edit(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `While editing server message: ${e}`, 'error');
-                return;
-            }
+            if (await Client.client.messageEdit(message, content) === undefined) return;
         }
         else {
             const channel = module.exports.getTextChannelById(guildId, instance.channelId.servers);
@@ -354,8 +464,107 @@ module.exports = {
                 return;
             }
 
-            message = await channel.send(content);
+            message = await Client.client.messageSend(channel, content);
             instance.serverList[id].messageId = message.id;
+            Client.client.writeInstanceFile(guildId, instance);
+        }
+    },
+
+    getTrackerEmbed: function (guildId, trackerName) {
+        const instance = Client.client.readInstanceFile(guildId);
+        const serverId = instance.trackers[trackerName].serverId;
+        const battlemetricsId = instance.trackers[trackerName].battlemetricsId;
+        const serverStatus = (instance.trackers[trackerName].status) ?
+            Constants.ONLINE_EMOJI : Constants.OFFLINE_EMOJI;
+
+        let playerName = '';
+        let playerSteamId = '';
+        let playerStatus = '';
+        for (let player of instance.trackers[trackerName].players) {
+            playerName += `${player.name}\n`;
+            playerSteamId += `${player.steamId}\n`;
+            playerStatus += `${(player.status === true) ?
+                `${Constants.ONLINE_EMOJI} [${player.time}]` : `${Constants.OFFLINE_EMOJI}`}\n`;
+        }
+
+        if (playerName === '' || playerSteamId === '' || playerStatus === '') {
+            playerName = 'Empty';
+            playerSteamId = 'Empty';
+            playerStatus = 'Empty';
+        }
+
+        let embed = new MessageEmbed()
+            .setTitle(`${trackerName}`)
+            .setColor('#ce412b')
+            .setDescription(`**Battlemetrics ID:** \`${battlemetricsId}\`\n**Server Status:** ${serverStatus}`)
+            .setThumbnail(`${instance.serverList[serverId].img}`)
+            .addFields(
+                { name: 'Name', value: playerName, inline: true },
+                { name: 'SteamID', value: playerSteamId, inline: true },
+                { name: 'Status', value: playerStatus, inline: true }
+            )
+            .setFooter({ text: `${instance.serverList[serverId].title}` })
+
+        return embed;
+    },
+
+    getTrackerButtons: function (guildId, trackerName) {
+        const instance = Client.client.readInstanceFile(guildId);
+
+        return new MessageActionRow()
+            .addComponents(
+                new MessageButton()
+                    .setCustomId(`${trackerName}TrackerActive`)
+                    .setLabel((instance.trackers[trackerName].active) ? 'ACTIVE' : 'INACTIVE')
+                    .setStyle((instance.trackers[trackerName].active) ? 'SUCCESS' : 'DANGER'),
+                new MessageButton()
+                    .setCustomId(`${trackerName}TrackerEveryone`)
+                    .setLabel('@everyone')
+                    .setStyle((instance.trackers[trackerName].everyone) ? 'SUCCESS' : 'DANGER'),
+                new MessageButton()
+                    .setCustomId(`${trackerName}TrackerDelete`)
+                    .setEmoji('🗑️')
+                    .setStyle('SECONDARY'))
+    },
+
+    sendTrackerMessage: async function (guildId, trackerName, e = true, c = true, interaction = null) {
+        const instance = Client.client.readInstanceFile(guildId);
+
+        const embed = module.exports.getTrackerEmbed(guildId, trackerName);
+        const buttons = module.exports.getTrackerButtons(guildId, trackerName);
+
+        let content = new Object();
+        if (e) {
+            content.embeds = [embed];
+        }
+        if (c) {
+            content.components = [buttons];
+        }
+
+        if (interaction) {
+            await Client.client.interactionUpdate(interaction, content);
+            return;
+        }
+
+        let messageId = instance.trackers[trackerName].messageId;
+        let message = undefined;
+        if (messageId !== null) {
+            message = await module.exports.getMessageById(guildId, instance.channelId.trackers, messageId);
+        }
+
+        if (message !== undefined) {
+            if (await Client.client.messageEdit(message, content) === undefined) return;
+        }
+        else {
+            const channel = module.exports.getTextChannelById(guildId, instance.channelId.trackers);
+
+            if (!channel) {
+                Client.client.log('ERROR', 'sendTrackerMessage: Invalid guild or channel.', 'error');
+                return;
+            }
+
+            message = await Client.client.messageSend(channel, content);
+            instance.trackers[trackerName].messageId = message.id;
             Client.client.writeInstanceFile(guildId, instance);
         }
     },
@@ -366,12 +575,13 @@ module.exports = {
         return new MessageEmbed()
             .setTitle(`${instance.switches[id].name}`)
             .setColor((instance.switches[id].active) ? '#00ff40' : '#ff0040')
-            .setDescription(`ID: \`${id}\``)
+            .setDescription(`**ID**: \`${id}\``)
             .setThumbnail(`attachment://${instance.switches[id].image}`)
             .addFields(
                 {
                     name: 'Custom Command',
-                    value: `${instance.generalSettings.prefix}${instance.switches[id].command}`, inline: true
+                    value: `\`${instance.generalSettings.prefix}${instance.switches[id].command}\``,
+                    inline: true
                 }
             )
             .setFooter({ text: `${instance.switches[id].server}` })
@@ -382,20 +592,20 @@ module.exports = {
 
         let autoDayNightString = 'AUTO SETTING: ';
         switch (instance.switches[id].autoDayNight) {
-            case 0:
+            case 0: {
                 autoDayNightString += 'OFF';
-                break;
+            } break;
 
-            case 1:
+            case 1: {
                 autoDayNightString += 'AUTO-DAY';
-                break;
+            } break;
 
-            case 2:
+            case 2: {
                 autoDayNightString += 'AUTO-NIGHT';
-                break;
+            } break;
 
-            default:
-                break;
+            default: {
+            } break;
         }
 
         return new MessageActionRow()
@@ -460,23 +670,13 @@ module.exports = {
         }
 
         if (interaction) {
-            try {
-                await interaction.update(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `Unknown interaction`, 'error');
-            }
+            await Client.client.interactionUpdate(interaction, content);
             return;
         }
 
         if (Client.client.switchesMessages[guildId][id]) {
-            try {
-                await Client.client.switchesMessages[guildId][id].edit(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `While editing smart switch message: ${e}`, 'error');
-                return;
-            }
+            let message = Client.client.switchesMessages[guildId][id];
+            if (await Client.client.messageEdit(message, content) === undefined) return;
         }
         else {
             const channel = module.exports.getTextChannelById(guildId, instance.channelId.switches);
@@ -485,7 +685,7 @@ module.exports = {
                 Client.client.log('ERROR', 'sendSmartSwitchMessage: Invalid guild or channel.', 'error');
                 return;
             }
-            Client.client.switchesMessages[guildId][id] = await channel.send(content);
+            Client.client.switchesMessages[guildId][id] = await Client.client.messageSend(channel, content);
         }
     },
 
@@ -495,8 +695,8 @@ module.exports = {
         return new MessageEmbed()
             .setTitle(`${instance.alarms[id].name}`)
             .setColor((instance.alarms[id].active) ? '#00ff40' : '#ce412b')
+            .setDescription(`**ID**: \`${id}\``)
             .addFields(
-                { name: 'ID', value: `\`${id}\``, inline: true },
                 { name: 'Message', value: `\`${instance.alarms[id].message}\``, inline: true }
             )
             .setThumbnail(`attachment://${instance.alarms[id].image}`)
@@ -537,12 +737,7 @@ module.exports = {
         }
 
         if (interaction) {
-            try {
-                await interaction.update(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `Unknown interaction`, 'error');
-            }
+            await Client.client.interactionUpdate(interaction, content);
             return;
         }
 
@@ -553,13 +748,7 @@ module.exports = {
         }
 
         if (message !== undefined) {
-            try {
-                await message.edit(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `While editing smart alarm message: ${e}`, 'error');
-                return;
-            }
+            if (await Client.client.messageEdit(message, content) === undefined) return;
         }
         else {
             const channel = module.exports.getTextChannelById(guildId, instance.channelId.alarms);
@@ -569,7 +758,7 @@ module.exports = {
                 return;
             }
 
-            message = await channel.send(content);
+            message = await Client.client.messageSend(channel, content);
             instance.alarms[id].messageId = message.id;
             Client.client.writeInstanceFile(guildId, instance);
         }
@@ -625,7 +814,7 @@ module.exports = {
         }
 
         for (const [id, quantity] of Object.entries(storageItems)) {
-            itemName += `${Client.client.items.getName(id)}\n`;
+            itemName += `\`${Client.client.items.getName(id)}\`\n`;
             itemQuantity += `\`${quantity}\`\n`;
         }
 
@@ -699,23 +888,13 @@ module.exports = {
         }
 
         if (interaction) {
-            try {
-                await interaction.update(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `Unknown interaction`, 'error');
-            }
+            await Client.client.interactionUpdate(interaction, content);
             return;
         }
 
         if (Client.client.storageMonitorsMessages[guildId][id]) {
-            try {
-                await Client.client.storageMonitorsMessages[guildId][id].edit(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `While editing storage monitor message: ${e}`, 'error');
-                return;
-            }
+            let message = Client.client.storageMonitorsMessages[guildId][id];
+            if (await Client.client.messageEdit(message, content) === undefined) return;
         }
         else {
             const channel = module.exports.getTextChannelById(guildId, instance.channelId.storageMonitors);
@@ -724,7 +903,7 @@ module.exports = {
                 Client.client.log('ERROR', 'sendStorageMonitorMessage: Invalid guild or channel.', 'error');
                 return;
             }
-            Client.client.storageMonitorsMessages[guildId][id] = await channel.send(content);
+            Client.client.storageMonitorsMessages[guildId][id] = await Client.client.messageSend(channel, content);
         }
     },
 
@@ -749,7 +928,7 @@ module.exports = {
                 content.content = '@everyone';
             }
 
-            await channel.send(content);
+            await Client.client.messageSend(channel, content);
         }
     },
 
@@ -774,7 +953,7 @@ module.exports = {
                 content.content = '@everyone';
             }
 
-            await channel.send(content);
+            await Client.client.messageSend(channel, content);
         }
     },
 
@@ -799,7 +978,7 @@ module.exports = {
                 content.content = '@everyone';
             }
 
-            await channel.send(content);
+            await Client.client.messageSend(channel, content);
         }
     },
 
@@ -820,7 +999,7 @@ module.exports = {
 
             content.files = [file];
 
-            await channel.send(content);
+            await Client.client.messageSend(channel, content);
         }
     },
 
@@ -841,15 +1020,14 @@ module.exports = {
 
             content.files = [file];
 
-            await channel.send(content);
+            await Client.client.messageSend(channel, content);
         }
     },
 
     getSmartSwitchGroupEmbed: function (guildId, name) {
         const instance = Client.client.readInstanceFile(guildId);
         let rustplus = Client.client.rustplusInstances[guildId];
-        let server = `${rustplus.server}-${rustplus.port}`;
-        let group = instance.serverList[server].switchGroups[name];
+        let group = instance.serverList[rustplus.serverId].switchGroups[name];
 
         let switchName = '';
         let switchId = '';
@@ -862,8 +1040,8 @@ module.exports = {
                 switchActive += `${(active) ? Constants.ONLINE_EMOJI : Constants.OFFLINE_EMOJI}\n`;
             }
             else {
-                instance.serverList[server].switchGroups[name].switches =
-                    instance.serverList[server].switchGroups[name].switches.filter(e => e !== groupSwitchId);
+                instance.serverList[rustplus.serverId].switchGroups[name].switches =
+                    instance.serverList[rustplus.serverId].switchGroups[name].switches.filter(e => e !== groupSwitchId);
             }
         }
         Client.client.writeInstanceFile(guildId, instance);
@@ -889,7 +1067,7 @@ module.exports = {
                 { name: 'ID', value: switchId, inline: true },
                 { name: 'Active', value: switchActive, inline: true }
             )
-            .setFooter({ text: `${instance.serverList[server].title}` })
+            .setFooter({ text: `${instance.serverList[rustplus.serverId].title}` })
     },
 
     getSmartSwitchGroupButtons: function (name) {
@@ -928,23 +1106,13 @@ module.exports = {
         }
 
         if (interaction) {
-            try {
-                await interaction.update(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `Unknown interaction`, 'error');
-            }
+            await Client.client.interactionUpdate(interaction, content);
             return;
         }
 
         if (Client.client.switchesMessages[guildId][name]) {
-            try {
-                await Client.client.switchesMessages[guildId][name].edit(content);
-            }
-            catch (e) {
-                Client.client.log('ERROR', `While editing smart switch group message: ${e}`, 'error');
-                return;
-            }
+            let message = Client.client.switchesMessages[guildId][name];
+            if (await Client.client.messageEdit(message, content) === undefined) return;
         }
         else {
             const channel = module.exports.getTextChannelById(guildId, instance.channelId.switches);
@@ -953,7 +1121,51 @@ module.exports = {
                 Client.client.log('ERROR', 'sendSmartSwitchGroupMessage: Invalid guild or channel.', 'error');
                 return;
             }
-            Client.client.switchesMessages[guildId][name] = await channel.send(content);
+            Client.client.switchesMessages[guildId][name] = await Client.client.messageSend(channel, content);
+        }
+    },
+
+    sendTrackerAllOffline: async function (guildId, trackerName) {
+        const instance = Client.client.readInstanceFile(guildId);
+        const serverId = instance.trackers[trackerName].serverId;
+        let channel = module.exports.getTextChannelById(guildId, instance.channelId.activity);
+
+        if (channel) {
+            let content = {};
+            content.embeds = [new MessageEmbed()
+                .setTitle(`Everyone from the tracker \`${trackerName}\` just went offline.`)
+                .setColor('#ff0040')
+                .setThumbnail(`${instance.serverList[serverId].img}`)
+                .setFooter({ text: `${instance.serverList[serverId].title}` })
+                .setTimestamp()];
+
+            if (instance.trackers[trackerName].everyone) {
+                content.content = '@everyone';
+            }
+
+            await Client.client.messageSend(channel, content);
+        }
+    },
+
+    sendTrackerAnyOnline: async function (guildId, trackerName) {
+        const instance = Client.client.readInstanceFile(guildId);
+        const serverId = instance.trackers[trackerName].serverId;
+        let channel = module.exports.getTextChannelById(guildId, instance.channelId.activity);
+
+        if (channel) {
+            let content = {};
+            content.embeds = [new MessageEmbed()
+                .setTitle(`Someone from tracker \`${trackerName}\` just went online.`)
+                .setColor('#00ff40')
+                .setThumbnail(`${instance.serverList[serverId].img}`)
+                .setFooter({ text: `${instance.serverList[serverId].title}` })
+                .setTimestamp()];
+
+            if (instance.trackers[trackerName].everyone) {
+                content.content = '@everyone';
+            }
+
+            await Client.client.messageSend(channel, content);
         }
     },
 }

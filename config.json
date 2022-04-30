@@ -1,9 +1,10 @@
 {
     "general": {
-        "pollingIntervalMs": 10000
+        "pollingIntervalMs": 10000,
+        "showCallStackError": false
     },
     "discord": {
-        "clientId": "929205687286890568",
-        "token": "OTI5MjA1Njg3Mjg2ODkwNTY4.Ydj8Ow.ZC6Ssfhy_Ee5I8RciwWszv04jgc"
+        "clientId": "",
+        "token": ""
     }
 }

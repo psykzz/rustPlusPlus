@@ -5,6 +5,7 @@ const Map = require('../util/map.js');
 const Constants = require('../util/constants.js');
 const TeamHandler = require('../handlers/teamHandler.js');
 const SmartSwitchGroupHandler = require('./smartSwitchGroupHandler.js');
+const string = require('../util/string.js');
 
 module.exports = {
     inGameCommandHandler: async function (rustplus, client, message) {
@@ -137,14 +138,19 @@ module.exports = {
 
                         rustplus.interactionSwitches = rustplus.interactionSwitches.filter(e => e !== id);
 
-                        await client.switchesMessages[rustplus.guildId][id].delete();
+                        try {
+                            await client.switchesMessages[rustplus.guildId][id].delete();
+                        }
+                        catch (e) {
+                            client.log('ERROR', `Could not delete switch message for entityId: ${id}.`, 'error');
+                        }
                         delete client.switchesMessages[rustplus.guildId][id];
                         return false;
                     }
 
                     DiscordTools.sendSmartSwitchMessage(rustplus.guildId, id, true, true, false);
                     SmartSwitchGroupHandler.updateSwitchGroupIfContainSwitch(
-                        client, rustplus.guildId, `${rustplus.server}-${rustplus.port}`, id);
+                        client, rustplus.guildId, rustplus.serverId, id);
 
                     let str = `${instance.switches[id].name} was turned `;
                     str += (active) ? 'on.' : 'off.';
@@ -154,23 +160,35 @@ module.exports = {
                 }
             }
 
-            let groups = instance.serverList[`${rustplus.server}-${rustplus.port}`].switchGroups;
+            let groups = instance.serverList[rustplus.serverId].switchGroups;
             for (const [groupName, content] of Object.entries(groups)) {
                 let cmd = `${rustplus.generalSettings.prefix}${content.command}`;
                 if (command.startsWith(cmd)) {
                     let active;
                     if (command === `${cmd} on`) {
                         active = true;
+                        rustplus.printCommandOutput(`Turning ${groupName} ON.`);
                     }
                     else if (command === `${cmd} off`) {
                         active = false;
+                        rustplus.printCommandOutput(`Turning ${groupName} OFF.`);
+                    }
+                    else if (command === `${cmd}`) {
+                        /* Get switch info, create message */
+                        var switchStatus = content.switches.map(switchId => {
+                            const { active, name } = instance.switches[switchId];
+                            return { active, name }
+                        });
+                        const statusMessage = switchStatus.map(status =>
+                            `${status.name}: ${status.active ? 'ON' : 'OFF'}`).join(', ');
+                        rustplus.printCommandOutput(`Status: ${statusMessage}`);
                     }
                     else {
                         return false;
                     }
 
                     await SmartSwitchGroupHandler.TurnOnOffGroup(
-                        client, rustplus, rustplus.guildId, `${rustplus.server}-${rustplus.port}`, groupName, active);
+                        client, rustplus, rustplus.guildId, rustplus.serverId, groupName, active);
 
                     return true;
                 }
@@ -193,35 +211,32 @@ module.exports = {
             }
         }
 
-        str = (str !== '') ? str.slice(0, -2) : 'No one is AFK.';
+        str = (str !== '') ? `${str.slice(0, -2)}.` : 'No one is AFK.';
         rustplus.printCommandOutput(str);
     },
 
     commandAlive: function (rustplus) {
         let player = rustplus.team.getPlayerLongestAlive();
         let time = player.getAliveTime();
-        rustplus.printCommandOutput(`${player.name} has been alive the longest (${time})`);
+        rustplus.printCommandOutput(`${player.name} has been alive the longest (${time}).`);
     },
 
     commandBradley: function (rustplus) {
         let strings = [];
 
-        let timerCounter = 0;
-        for (const [id, timer] of Object.entries(rustplus.bradleyRespawnTimers)) {
-            timerCounter += 1;
+        for (const [id, timer] of Object.entries(rustplus.mapMarkers.bradleyAPCRespawnTimers)) {
             let time = Timer.getTimeLeftOfTimer(timer);
-
             if (time !== null) {
                 strings.push(`Approximately ${time} before Bradley APC respawns.`);
             }
         }
 
-        if (timerCounter === 0) {
-            if (rustplus.timeSinceBradleyWasDestroyed === null) {
+        if (strings.length === 0) {
+            if (rustplus.mapMarkers.timeSinceBradleyAPCWasDestroyed === null) {
                 strings.push('Bradley APC is probably roaming around at Launch Site.');
             }
             else {
-                let secondsSince = (new Date() - rustplus.timeSinceBradleyWasDestroyed) / 1000;
+                let secondsSince = (new Date() - rustplus.mapMarkers.timeSinceBradleyAPCWasDestroyed) / 1000;
                 let timeSince = Timer.secondsToFullScale(secondsSince);
                 strings.push(`It was ${timeSince} since Bradley APC got destroyed.`)
             }
@@ -234,36 +249,33 @@ module.exports = {
 
     commandCargo: function (rustplus) {
         let strings = [];
-        let unhandled = Object.keys(rustplus.activeCargoShips);
-        let numOfShips = unhandled.length;
+        let unhandled = rustplus.mapMarkers.cargoShips.map(e => e.id);
 
-        for (const [id, timer] of Object.entries(rustplus.cargoShipEgressTimers)) {
-            unhandled = unhandled.filter(e => e != parseInt(id));
+        for (const [id, timer] of Object.entries(rustplus.mapMarkers.cargoShipEgressTimers)) {
+            let cargoShip = rustplus.mapMarkers.getMarkerByTypeId(rustplus.mapMarkers.types.CargoShip, parseInt(id));
             let time = Timer.getTimeLeftOfTimer(timer);
-            let pos = rustplus.activeCargoShips[parseInt(id)].location;
-            let crates = rustplus.activeCargoShips[parseInt(id)].crates.length;
 
             if (time !== null) {
-                strings.push(
-                    `Approximately ${time} before Cargo Ship at ${pos} enters egress stage.` +
-                    ` Active crates: (${crates}/3)`);
+                strings.push(`Approximately ${time} before Cargo Ship at ${cargoShip.location} enters egress stage.` +
+                    ` Active crates: (${cargoShip.crates.length}/3).`);
             }
+            unhandled = unhandled.filter(e => e != parseInt(id));
         }
 
         if (unhandled.length > 0) {
-            for (let cargoShip of unhandled) {
-                let pos = rustplus.activeCargoShips[cargoShip].location;
-                let crates = rustplus.activeCargoShips[cargoShip].crates.length;
-                strings.push(`Cargo Ship is located at ${pos}. Active crates: (${crates}/3)`);
+            for (let id of unhandled) {
+                let cargoShip = rustplus.mapMarkers.getMarkerByTypeId(rustplus.mapMarkers.types.CargoShip, id);
+                strings.push(`Cargo Ship is located at ${cargoShip.location}.` +
+                    ` Active crates: (${cargoShip.crates.length}/3).`);
             }
         }
 
-        if (numOfShips === 0) {
-            if (rustplus.timeSinceCargoWasOut === null) {
+        if (strings.length === 0) {
+            if (rustplus.mapMarkers.timeSinceCargoShipWasOut === null) {
                 strings.push('Cargo Ship is currently not on the map.');
             }
             else {
-                let secondsSince = (new Date() - rustplus.timeSinceCargoWasOut) / 1000;
+                let secondsSince = (new Date() - rustplus.mapMarkers.timeSinceCargoShipWasOut) / 1000;
                 let timeSince = Timer.secondsToFullScale(secondsSince);
                 strings.push(`It was ${timeSince} since Cargo Ship left.`)
             }
@@ -277,20 +289,18 @@ module.exports = {
     commandChinook: function (rustplus) {
         let strings = [];
 
-        let chinookCounter = 0;
-        for (const [id, content] of Object.entries(rustplus.activeChinook47s)) {
-            if (content.type === 'crate') {
-                chinookCounter += 1;
-                strings.push(`Chinook 47 is located at ${content.location}`);
+        for (let ch47 of rustplus.mapMarkers.ch47s) {
+            if (ch47.ch47Type === 'crate') {
+                strings.push(`Chinook 47 is located at ${ch47.location}.`);
             }
         }
 
-        if (chinookCounter === 0) {
-            if (rustplus.timeSinceChinookWasOut === null) {
+        if (strings.length === 0) {
+            if (rustplus.mapMarkers.timeSinceCH47WasOut === null) {
                 strings.push('No current data on Chinook 47.');
             }
             else {
-                let secondsSince = (new Date() - rustplus.timeSinceChinookWasOut) / 1000;
+                let secondsSince = (new Date() - rustplus.mapMarkers.timeSinceCH47WasOut) / 1000;
                 let timeSince = Timer.secondsToFullScale(secondsSince);
                 strings.push(`It was ${timeSince} since the last Chinook 47 was on the map.`);
             }
@@ -304,21 +314,34 @@ module.exports = {
     commandCrate: function (rustplus) {
         let strings = [];
 
-        for (const [id, timer] of Object.entries(rustplus.lockedCrateDespawnTimers)) {
+        for (const [id, timer] of Object.entries(rustplus.mapMarkers.crateDespawnTimers)) {
+            let crate = rustplus.mapMarkers.getMarkerByTypeId(rustplus.mapMarkers.types.Crate, parseInt(id));
             let time = Timer.getTimeLeftOfTimer(timer);
-            let pos = rustplus.activeLockedCrates[parseInt(id)].type;
 
             if (time !== null) {
-                strings.push(`Approximately ${time} before Locked Crate at ${pos} despawns.`);
+                strings.push(`Approximately ${time} before Locked Crate at ${crate.crateType} despawns.`);
             }
         }
 
         if (strings.length === 0) {
-            if (rustplus.timeSinceChinookDroppedCrate === null) {
-                strings.push('No current data on Chinook 47 Locked Crate.');
+            if (rustplus.mapMarkers.timeSinceCH47DroppedCrate === null) {
+                for (let crate of rustplus.mapMarkers.crates) {
+                    if (!['cargoShip', 'oil_rig_small', 'large_oil_rig', 'invalid'].includes(crate.crateType)) {
+                        if (crate.crateType === 'grid') {
+                            strings.push(`A Locked Crate is located at ${crate.location}.`);
+                        }
+                        else {
+                            strings.push(`A Locked Crate is located at ${crate.crateType}.`);
+                        }
+                    }
+                }
+
+                if (strings.length === 0) {
+                    strings.push('No active Crates.');
+                }
             }
             else {
-                let secondsSince = (new Date() - rustplus.timeSinceChinookDroppedCrate) / 1000;
+                let secondsSince = (new Date() - rustplus.mapMarkers.timeSinceCH47DroppedCrate) / 1000;
                 let timeSince = Timer.secondsToFullScale(secondsSince);
                 strings.push(`It was ${timeSince} since the last Chinook 47 Locked Crate was dropped.`);
             }
@@ -332,30 +355,30 @@ module.exports = {
     commandHeli: function (rustplus) {
         let strings = [];
 
-        let heliCounter = 0;
-        for (const [id, content] of Object.entries(rustplus.activePatrolHelicopters)) {
-            heliCounter += 1;
-            strings.push(`Patrol Helicopter is located at ${content.location}.`);
+        for (let patrolHelicopter of rustplus.mapMarkers.patrolHelicopters) {
+            strings.push(`Patrol Helicopter is located at ${patrolHelicopter.location}.`);
         }
 
-        if (heliCounter === 0) {
-            if (rustplus.timeSinceHeliWasOnMap === null &&
-                rustplus.timeSinceHeliWasDestroyed === null) {
+        if (strings.length === 0) {
+            let wasOnMap = rustplus.mapMarkers.timeSincePatrolHelicopterWasOnMap;
+            let wasDestroyed = rustplus.mapMarkers.timeSincePatrolHelicopterWasDestroyed;
+
+            if (wasOnMap === null && WasDestroyed === null) {
                 strings.push('No current data on Patrol Helicopter.');
             }
-            else if (rustplus.timeSinceHeliWasOnMap !== null &&
-                rustplus.timeSinceHeliWasDestroyed === null) {
-                let secondsSince = (new Date() - rustplus.timeSinceHeliWasOnMap) / 1000;
+            else if (wasOnMap !== null && wasDestroyed === null) {
+                let secondsSince = (new Date() - wasOnMap) / 1000;
                 let timeSince = Timer.secondsToFullScale(secondsSince);
                 strings.push(`It was ${timeSince} since the last Patrol Helicopter was on the map.`);
             }
-            else if (rustplus.timeSinceHeliWasOnMap !== null &&
-                rustplus.timeSinceHeliWasDestroyed !== null) {
-                let secondsSince = (new Date() - rustplus.timeSinceHeliWasOnMap) / 1000;
-                let timeSinceOut = Timer.secondsToFullScale(secondsSince);
-                secondsSince = (new Date() - rustplus.timeSinceHeliWasDestroyed) / 1000;
+            else if (wasOnMap !== null && wasDestroyed !== null) {
+                let secondsSince = (new Date() - wasOnMap) / 1000;
+                let timeSinceOnMap = Timer.secondsToFullScale(secondsSince);
+
+                secondsSince = (new Date() - wasDestroyed) / 1000;
                 let timeSinceDestroyed = Timer.secondsToFullScale(secondsSince);
-                strings.push(`It was ${timeSinceOut} since Patrol Helicopter was on the map and ` +
+
+                strings.push(`It was ${timeSinceOnMap} since Patrol Helicopter was on the map and ` +
                     `${timeSinceDestroyed} since it got downed.`);
             }
         }
@@ -368,23 +391,22 @@ module.exports = {
     commandLarge: function (rustplus) {
         let strings = [];
 
-        let timerCounter = 0;
-        for (const [id, timer] of Object.entries(rustplus.lockedCrateLargeOilRigTimers)) {
-            timerCounter += 1;
+        for (const [id, timer] of Object.entries(rustplus.mapMarkers.crateLargeOilRigTimers)) {
+            let crate = rustplus.mapMarkers.getMarkerByTypeId(rustplus.mapMarkers.types.Crate, parseInt(id));
             let time = Timer.getTimeLeftOfTimer(timer);
-            let pos = rustplus.activeLockedCrates[parseInt(id)].location;
 
             if (time !== null) {
-                strings.push(`Approximately ${time} before Locked Crate unlocks at Large Oil Rig at ${pos}.`);
+                strings.push(
+                    `Approximately ${time} before Locked Crate unlocks at Large Oil Rig at ${crate.location}.`);
             }
         }
 
-        if (timerCounter === 0) {
-            if (rustplus.timeSinceLargeOilRigWasTriggered === null) {
+        if (strings.length === 0) {
+            if (rustplus.mapMarkers.timeSinceLargeOilRigWasTriggered === null) {
                 strings.push('No current data on Large Oil Rig.');
             }
             else {
-                let secondsSince = (new Date() - rustplus.timeSinceLargeOilRigWasTriggered) / 1000;
+                let secondsSince = (new Date() - rustplus.mapMarkers.timeSinceLargeOilRigWasTriggered) / 1000;
                 let timeSince = Timer.secondsToFullScale(secondsSince);
                 strings.push(`It was ${timeSince} since Large Oil Rig last got triggered.`);
             }
@@ -472,7 +494,6 @@ module.exports = {
     commandMarker: async function (rustplus, client, message) {
         let callerId = message.broadcast.teamMessage.message.steamId.toString();
         let command = message.broadcast.teamMessage.message.message;
-        let serverId = `${rustplus.server}-${rustplus.port}`;
 
         if (!command.startsWith(`${rustplus.generalSettings.prefix}marker `)) {
             return;
@@ -497,7 +518,7 @@ module.exports = {
                     }
                 }
 
-                instance.markers[serverId][command] = callerLocation;
+                instance.markers[rustplus.serverId][command] = callerLocation;
                 client.writeInstanceFile(rustplus.guildId, instance);
                 rustplus.markers[command] = callerLocation;
 
@@ -510,7 +531,7 @@ module.exports = {
 
                 if (command in rustplus.markers) {
                     delete rustplus.markers[command];
-                    delete instance.markers[serverId][command];
+                    delete instance.markers[rustplus.serverId][command];
                     client.writeInstanceFile(rustplus.guildId, instance);
 
                     let str = `Marker '${command}' was removed.`;
@@ -578,20 +599,19 @@ module.exports = {
     commandNote: function (rustplus, client, message) {
         let command = message.broadcast.teamMessage.message.message;
         let instance = client.readInstanceFile(rustplus.guildId);
-        let serverId = `${rustplus.server}-${rustplus.port}`;
 
-        if (!instance.serverList[serverId].hasOwnProperty('notes')) {
-            instance.serverList[serverId].notes = {};
+        if (!instance.serverList[rustplus.serverId].hasOwnProperty('notes')) {
+            instance.serverList[rustplus.serverId].notes = {};
         }
 
         if (command === `${rustplus.generalSettings.prefix}notes`) {
-            if (Object.keys(instance.serverList[serverId].notes).length === 0) {
+            if (Object.keys(instance.serverList[rustplus.serverId].notes).length === 0) {
                 rustplus.printCommandOutput('There are no saved notes.');
             }
             else {
                 rustplus.printCommandOutput('Notes:');
             }
-            for (const [id, note] of Object.entries(instance.serverList[serverId].notes)) {
+            for (const [id, note] of Object.entries(instance.serverList[rustplus.serverId].notes)) {
                 let str = `${id}: ${note}`;
                 rustplus.printCommandOutput(str);
             }
@@ -600,12 +620,12 @@ module.exports = {
             let id = parseInt(command.replace(`${rustplus.generalSettings.prefix}note remove`, '').trim());
 
             if (!isNaN(id)) {
-                if (!Object.keys(instance.serverList[serverId].notes).map(Number).includes(id)) {
+                if (!Object.keys(instance.serverList[rustplus.serverId].notes).map(Number).includes(id)) {
                     rustplus.printCommandOutput('Note ID does not exist.');
                     return;
                 }
 
-                delete instance.serverList[serverId].notes[id];
+                delete instance.serverList[rustplus.serverId].notes[id];
                 rustplus.printCommandOutput(`Note with ID: ${id} was removed.`);
                 client.writeInstanceFile(rustplus.guildId, instance);
                 return;
@@ -616,11 +636,11 @@ module.exports = {
             let note = command.replace(`${rustplus.generalSettings.prefix}note `, '').trim();
 
             index = 0;
-            while (Object.keys(instance.serverList[serverId].notes).map(Number).includes(index)) {
+            while (Object.keys(instance.serverList[rustplus.serverId].notes).map(Number).includes(index)) {
                 index += 1;
             }
 
-            instance.serverList[serverId].notes[index] = `${note}`;
+            instance.serverList[rustplus.serverId].notes[index] = `${note}`;
             rustplus.printCommandOutput('Note saved.');
         }
 
@@ -635,7 +655,7 @@ module.exports = {
             }
         }
 
-        str = (str !== '') ? str.slice(0, -2) : 'No one is offline.';
+        str = (str !== '') ? `${str.slice(0, -2)}.` : 'No one is offline.';
         rustplus.printCommandOutput(str);
     },
 
@@ -647,7 +667,7 @@ module.exports = {
             }
         }
 
-        str = str.slice(0, -2);
+        str = `${str.slice(0, -2)}.`;
         rustplus.printCommandOutput(str);
     },
 
@@ -710,7 +730,7 @@ module.exports = {
                 str = 'All your teammates are dead.';
             }
             else {
-                str = str.slice(0, -2);
+                str = `${str.slice(0, -2)}.`;
             }
 
             rustplus.printCommandOutput(str);
@@ -752,23 +772,22 @@ module.exports = {
     commandSmall: function (rustplus) {
         let strings = [];
 
-        let timerCounter = 0;
-        for (const [id, timer] of Object.entries(rustplus.lockedCrateSmallOilRigTimers)) {
-            timerCounter += 1;
+        for (const [id, timer] of Object.entries(rustplus.mapMarkers.crateSmallOilRigTimers)) {
+            let crate = rustplus.mapMarkers.getMarkerByTypeId(rustplus.mapMarkers.types.Crate, parseInt(id));
             let time = Timer.getTimeLeftOfTimer(timer);
-            let pos = rustplus.activeLockedCrates[parseInt(id)].location;
 
             if (time !== null) {
-                strings.push(`Approximately ${time} before Locked Crate unlocks at Small Oil Rig at ${pos}.`);
+                strings.push(
+                    `Approximately ${time} before Locked Crate unlocks at Small Oil Rig at ${crate.location}.`);
             }
         }
 
-        if (timerCounter === 0) {
-            if (rustplus.timeSinceSmallOilRigWasTriggered === null) {
+        if (strings.length === 0) {
+            if (rustplus.mapMarkers.timeSinceSmallOilRigWasTriggered === null) {
                 strings.push('No current data on Small Oil Rig.');
             }
             else {
-                let secondsSince = (new Date() - rustplus.timeSinceSmallOilRigWasTriggered) / 1000;
+                let secondsSince = (new Date() - rustplus.mapMarkers.timeSinceSmallOilRigWasTriggered) / 1000;
                 let timeSince = Timer.secondsToFullScale(secondsSince);
                 strings.push(`It was ${timeSince} since Small Oil Rig last got triggered.`);
             }
@@ -805,13 +824,13 @@ module.exports = {
         let subcommand = command.replace(/ .*/, '');
         command = command.slice(subcommand.length + 1);
 
-        if (subcommand !== 'remain' && command === '') {
+        if (subcommand !== 'list' && command === '') {
             return;
         }
 
         let id;
         switch (subcommand) {
-            case 'add':
+            case 'add': {
                 let time = command.replace(/ .*/, '');
                 let timeSeconds = Timer.getSecondsFromStringTime(time);
                 if (timeSeconds === null) {
@@ -831,7 +850,7 @@ module.exports = {
                 rustplus.timers[id] = {
                     timer: new Timer.timer(
                         () => {
-                            rustplus.printCommandOutput(`Timer: ${message}`, 'TIMER');
+                            rustplus.printCommandOutput(`Timer: ${message}.`, 'TIMER');
                             delete rustplus.timers[id]
                         },
                         timeSeconds * 1000),
@@ -840,9 +859,9 @@ module.exports = {
                 rustplus.timers[id].timer.start();
 
                 rustplus.printCommandOutput(`Timer set for ${time}.`);
-                break;
+            } break;
 
-            case 'remove':
+            case 'remove': {
                 id = parseInt(command.replace(/ .*/, ''));
                 if (id === 'NaN') {
                     return;
@@ -855,25 +874,26 @@ module.exports = {
                 rustplus.timers[id].timer.stop();
                 delete rustplus.timers[id];
 
-                rustplus.printCommandOutput(`Timer with ID: ${id} was removed`);
-                break;
+                rustplus.printCommandOutput(`Timer with ID: ${id} was removed.`);
+            } break;
 
-            case 'remain':
+            case 'list': {
                 if (Object.keys(rustplus.timers).length === 0) {
                     rustplus.printCommandOutput('No active timers.');
                 }
                 else {
                     rustplus.printCommandOutput('Active timers:');
                 }
+
                 for (const [id, content] of Object.entries(rustplus.timers)) {
                     let timeLeft = Timer.getTimeLeftOfTimer(content.timer);
                     let str = `- ID: ${parseInt(id)}, Time left: ${timeLeft}, Message: ${content.message}`;
                     rustplus.printCommandOutput(str);
                 }
-                break;
+            } break;
 
-            default:
-                break;
+            default: {
+            } break;
         }
     },
 

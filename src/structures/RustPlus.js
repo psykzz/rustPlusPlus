@@ -13,6 +13,8 @@ class RustPlus extends RP {
     constructor(guildId, serverIp, appPort, steamId, playerToken) {
         super(serverIp, appPort, steamId, playerToken);
 
+        this.serverId = `${this.server}-${this.port}`;
+
         this.guildId = guildId;
         this.intervalId = 0;
         this.logger = null;
@@ -31,59 +33,32 @@ class RustPlus extends RP {
         this.info = null;
         this.time = null;
         this.team = null;
+        this.mapMarkers = null;
 
         this.items = new Items();
 
-        this.trademarkString = 'RustPlus | ';
+        let instance = Client.client.readInstanceFile(guildId);
+        this.trademarkString = (instance.generalSettings.trademark === 'NOT SHOWING') ?
+            '' : `${instance.generalSettings.trademark} | `;
 
         this.oldsendTeamMessageAsync = this.sendTeamMessageAsync;
         this.sendTeamMessageAsync = async function (message) {
-            let trademark = (this.generalSettings.showTrademark) ? this.trademarkString : '';
-            let messageMaxLength = Constants.MAX_LENGTH_TEAM_MESSAGE - trademark.length;
+            let messageMaxLength = Constants.MAX_LENGTH_TEAM_MESSAGE - this.trademarkString.length;
             let strings = message.match(new RegExp(`.{1,${messageMaxLength}}(\\s|$)`, 'g'));
 
-            if (this.team.allOffline) {
+            if (this.team === null || this.team.allOffline) {
                 return;
             }
 
             for (let msg of strings) {
                 if (!this.generalSettings.muteInGameBotMessages) {
-                    await this.oldsendTeamMessageAsync(`${trademark}${msg}`);
+                    await this.oldsendTeamMessageAsync(`${this.trademarkString}${msg}`);
                 }
             }
         }
 
-        /* Event active entities */
-        this.activeCargoShips = new Object();
-        this.activeChinook47s = new Object();
-        this.activeLockedCrates = new Object();
-        this.activePatrolHelicopters = new Object();
-        this.activeExplosions = new Object();
-        this.patrolHelicoptersLeft = [];
-        this.smallOilRigLockedCratesLeft = [];
-        this.largeOilRigLockedCratesLeft = [];
-        this.activeVendingMachines = [];
-        this.foundItems = [];
-        this.itemsToLookForId = [];
-
         /* Event timers */
-        this.cargoShipEgressTimers = new Object();
-        this.lockedCrateSmallOilRigTimers = new Object();
-        this.lockedCrateLargeOilRigTimers = new Object();
-        this.lockedCrateDespawnTimers = new Object();
-        this.lockedCrateDespawnWarningTimers = new Object();
-        this.bradleyRespawnTimers = new Object();
         this.timers = new Object();
-
-        /* Event dates */
-        this.timeSinceCargoWasOut = null;
-        this.timeSinceChinookWasOut = null;
-        this.timeSinceBradleyWasDestroyed = null;
-        this.timeSinceHeliWasDestroyed = null;
-        this.timeSinceHeliWasOnMap = null;
-        this.timeSinceSmallOilRigWasTriggered = null;
-        this.timeSinceLargeOilRigWasTriggered = null;
-        this.timeSinceChinookDroppedCrate = null;
 
         /* Time variables */
         this.passedFirstSunriseOrSunset = false;
@@ -185,28 +160,8 @@ class RustPlus extends RP {
                 })
                 .setTimestamp();
 
-            channel.send({ embeds: [embed], files: [file] });
+            Client.client.messageSend(channel, { embeds: [embed], files: [file] });
         }
-    }
-
-    sendMessage(text) {
-        let instance = Client.client.readInstanceFile(this.guildId);
-        let channel = DiscordTools.getTextChannelById(this.guildId, instance.channelId.events);
-
-        if (channel !== undefined) {
-            channel.send(text);
-            this.log(text);
-        }
-    }
-
-    addItemToLookFor(id) {
-        if (!this.itemsToLookForId.includes(id)) {
-            this.itemsToLookForId.push(id);
-        }
-    }
-
-    removeItemToLookFor(id) {
-        this.itemsToLookForId = this.itemsToLookForId.filter(e => e !== id);
     }
 
     replenish_tokens() {

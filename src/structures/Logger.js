@@ -1,5 +1,6 @@
 const winston = require("winston");
 const colors = require("colors");
+const Config = require('../../config.json');
 
 class Logger {
     constructor(logFilePath, type) {
@@ -38,7 +39,7 @@ class Logger {
         let time = this.getTime();
 
         switch (this.type) {
-            case 'default':
+            case 'default': {
                 text = `${title}: ${text}`;
                 this.logger.log({
                     level: level,
@@ -49,9 +50,16 @@ class Logger {
                     colors.green(`${time} `) +
                     ((level === 'error') ? colors.red(text) : colors.yellow(text))
                 );
-                break;
 
-            case 'guild':
+                if (level === 'error' && Config.general.showCallStackError) {
+                    for (let line of (new Error().stack.split(/\r?\n/))) {
+                        this.logger.log({ level: level, message: `${time} | ${line}` });
+                        console.log(colors.green(`${time} `) + colors.red(line));
+                    }
+                }
+            } break;
+
+            case 'guild': {
                 text = `${title}: ${text}`;
 
                 this.logger.log({
@@ -65,10 +73,24 @@ class Logger {
                     colors.white(`${this.serverName} `) +
                     ((level === 'error') ? colors.red(text) : colors.yellow(text))
                 );
-                break;
 
-            default:
-                break;
+                if (level === 'error' && Config.general.showCallStackError) {
+                    for (let line of (new Error().stack.split(/\r?\n/))) {
+                        this.logger.log({
+                            level: level,
+                            message: `${time} | ${this.guildId} | ${this.serverName} | ${line}`
+                        });
+                        console.log(
+                            colors.green(`${time} `) +
+                            colors.cyan(`${this.guildId} `) +
+                            colors.white(`${this.serverName} `) +
+                            colors.red(line));
+                    }
+                }
+            } break;
+
+            default: {
+            } break;
         }
     }
 }

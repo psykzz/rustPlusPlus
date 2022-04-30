@@ -9,6 +9,7 @@ module.exports = (client, guild) => {
     if (!fs.existsSync(`${__dirname}/../instances/${guild.id}.json`)) {
         fs.writeFileSync(`${__dirname}/../instances/${guild.id}.json`, JSON.stringify({
             firstTime: true,
+            role: null,
             generalSettings: client.readGeneralSettingsTemplate(),
             notificationSettings: client.readNotificationSettingsTemplate(),
             channelId: {
@@ -21,7 +22,8 @@ module.exports = (client, guild) => {
                 switches: null,
                 alarms: null,
                 storageMonitors: null,
-                activity: null
+                activity: null,
+                trackers: null
             },
             informationMessageId: {
                 map: null,
@@ -33,14 +35,21 @@ module.exports = (client, guild) => {
             alarms: {},
             storageMonitors: {},
             markers: {},
-            serverList: {}
+            serverList: {},
+            trackers: {},
+            marketSubscribeItemIds: []
         }, null, 2));
     }
     else {
         let inst = client.readInstanceFile(guild.id);
 
-        if (!inst.hasOwnProperty('firstTime'))
+        if (!inst.hasOwnProperty('firstTime')) {
             inst.firstTime = true;
+        }
+
+        if (!inst.hasOwnProperty('role')) {
+            inst.role = null;
+        }
 
         if (!inst.hasOwnProperty('generalSettings')) {
             inst.generalSettings = client.readGeneralSettingsTemplate();
@@ -79,7 +88,8 @@ module.exports = (client, guild) => {
                 switches: null,
                 alarms: null,
                 storageMonitors: null,
-                activity: null
+                activity: null,
+                trackers: null
             }
         }
         else {
@@ -93,6 +103,7 @@ module.exports = (client, guild) => {
             if (!inst.channelId.hasOwnProperty('alarms')) inst.channelId.alarms = null;
             if (!inst.channelId.hasOwnProperty('storageMonitors')) inst.channelId.storageMonitors = null;
             if (!inst.channelId.hasOwnProperty('activity')) inst.channelId.activity = null;
+            if (!inst.channelId.hasOwnProperty('trackers')) inst.channelId.trackers = null;
         }
 
         if (!inst.hasOwnProperty('informationMessageId')) {
@@ -115,6 +126,8 @@ module.exports = (client, guild) => {
         if (!inst.hasOwnProperty('storageMonitors')) inst.storageMonitors = {};
         if (!inst.hasOwnProperty('markers')) inst.markers = {};
         if (!inst.hasOwnProperty('serverList')) inst.serverList = {};
+        if (!inst.hasOwnProperty('trackers')) inst.trackers = {};
+        if (!inst.hasOwnProperty('marketSubscribeItemIds')) inst.marketSubscribeItemIds = [];
 
         client.writeInstanceFile(guild.id, inst);
     }
