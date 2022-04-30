@@ -56,7 +56,7 @@ module.exports = {
             if (channel !== undefined) {
                 await rustplus.map.writeMap(true, true);
 
-                let file = new MessageAttachment(`src/resources/images/maps/${rustplus.guildId}_map_full.png`);
+                let file = new MessageAttachment(`/app/src/resources/images/maps/${rustplus.guildId}_map_full.png`);
                 await channel.send({
                     embeds: [new MessageEmbed()
                         .setColor('#ce412b')

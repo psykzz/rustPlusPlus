@@ -337,7 +337,7 @@ async function alarmAlarm(client, guild, full, data, body) {
                     .setTimestamp()];
 
             content.files = [
-                new MessageAttachment('src/resources/images/electrics/smart_alarm.png')];
+                new MessageAttachment('/app/src/resources/images/electrics/smart_alarm.png')];
 
             if (instance.generalSettings.fcmAlarmNotificationEveryone) {
                 content.content = '@everyone';

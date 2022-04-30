@@ -6,7 +6,7 @@ module.exports = async function (rustplus, client, message) {
     let instance = client.readInstanceFile(rustplus.guildId);
     let channel = DiscordTools.getTextChannelById(rustplus.guildId, instance.channelId.teamchat);
 
-    if (channel !== undefined) {
+    if (channel !== undefined && !message.message.startsWith(rustplus.trademarkString)) {
         let embed = new MessageEmbed()
             .setColor(message.color)
             .setDescription(`**${message.name}**: ${message.message}`)

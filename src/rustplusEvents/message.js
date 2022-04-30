@@ -69,7 +69,7 @@ module.exports = {
                                 .setTimestamp()];
 
                         content.files = [
-                            new MessageAttachment(`src/resources/images/electrics/${instance.alarms[id].image}`)];
+                            new MessageAttachment(`/app/src/resources/images/electrics/${instance.alarms[id].image}`)];
 
                         if (instance.alarms[id].everyone) {
                             content.content = '@everyone';

@@ -443,7 +443,7 @@ module.exports = {
     sendSmartSwitchMessage: async function (guildId, id, e = true, c = true, f = true, interaction = null) {
         const instance = Client.client.readInstanceFile(guildId);
 
-        const file = new MessageAttachment(`src/resources/images/electrics/${instance.switches[id].image}`);
+        const file = new MessageAttachment(`/app/src/resources/images/electrics/${instance.switches[id].image}`);
         const embed = module.exports.getSmartSwitchEmbed(guildId, id);
         const selectMenu = module.exports.getSmartSwitchSelectMenu(guildId, id);
         const buttons = module.exports.getSmartSwitchButtons(guildId, id);
@@ -521,7 +521,7 @@ module.exports = {
     sendSmartAlarmMessage: async function (guildId, id, e = true, c = true, f = true, interaction = null) {
         const instance = Client.client.readInstanceFile(guildId);
 
-        const file = new MessageAttachment(`src/resources/images/electrics/${instance.alarms[id].image}`);
+        const file = new MessageAttachment(`/app/src/resources/images/electrics/${instance.alarms[id].image}`);
         const embed = module.exports.getSmartAlarmEmbed(guildId, id);
         const buttons = module.exports.getSmartAlarmButtons(guildId, id);
 
@@ -677,7 +677,7 @@ module.exports = {
     sendStorageMonitorMessage: async function (guildId, id, e = true, c = true, f = true, interaction = null) {
         const instance = Client.client.readInstanceFile(guildId);
 
-        const file = new MessageAttachment(`src/resources/images/electrics/${instance.storageMonitors[id].image}`);
+        const file = new MessageAttachment(`/app/src/resources/images/electrics/${instance.storageMonitors[id].image}`);
         const embed = module.exports.getStorageMonitorEmbed(guildId, id);
         let buttons = null;
         if (instance.storageMonitors[id].type === 'toolcupboard') {
@@ -731,7 +731,7 @@ module.exports = {
     sendDecayingNotification: async function (guildId, id) {
         const instance = Client.client.readInstanceFile(guildId);
         let channel = module.exports.getTextChannelById(guildId, instance.channelId.activity);
-        const file = new MessageAttachment(`src/resources/images/electrics/${instance.storageMonitors[id].image}`);
+        const file = new MessageAttachment(`/app/src/resources/images/electrics/${instance.storageMonitors[id].image}`);
 
         if (channel) {
             let content = {};
@@ -756,7 +756,7 @@ module.exports = {
     sendStorageMonitorDisconnectNotification: async function (guildId, id) {
         const instance = Client.client.readInstanceFile(guildId);
         let channel = module.exports.getTextChannelById(guildId, instance.channelId.activity);
-        const file = new MessageAttachment(`src/resources/images/electrics/${instance.storageMonitors[id].image}`);
+        const file = new MessageAttachment(`/app/src/resources/images/electrics/${instance.storageMonitors[id].image}`);
 
         if (channel) {
             let content = {};
@@ -781,7 +781,7 @@ module.exports = {
     sendStorageMonitorNotFound: async function (guildId, id) {
         const instance = Client.client.readInstanceFile(guildId);
         let channel = module.exports.getTextChannelById(guildId, instance.channelId.activity);
-        const file = new MessageAttachment(`src/resources/images/electrics/${instance.storageMonitors[id].image}`);
+        const file = new MessageAttachment(`/app/src/resources/images/electrics/${instance.storageMonitors[id].image}`);
 
         if (channel) {
             let content = {};
@@ -806,7 +806,7 @@ module.exports = {
     sendSmartSwitchNotFound: async function (guildId, id) {
         const instance = Client.client.readInstanceFile(guildId);
         let channel = module.exports.getTextChannelById(guildId, instance.channelId.activity);
-        const file = new MessageAttachment(`src/resources/images/electrics/${instance.switches[id].image}`);
+        const file = new MessageAttachment(`/app/src/resources/images/electrics/${instance.switches[id].image}`);
 
         if (channel) {
             let content = {};
@@ -827,7 +827,7 @@ module.exports = {
     sendSmartAlarmNotFound: async function (guildId, id) {
         const instance = Client.client.readInstanceFile(guildId);
         let channel = module.exports.getTextChannelById(guildId, instance.channelId.activity);
-        const file = new MessageAttachment(`src/resources/images/electrics/${instance.alarms[id].image}`);
+        const file = new MessageAttachment(`/app/src/resources/images/electrics/${instance.alarms[id].image}`);
 
         if (channel) {
             let content = {};
@@ -912,7 +912,7 @@ module.exports = {
     sendSmartSwitchGroupMessage: async function (guildId, name, e = true, c = true, f = true, interaction = null) {
         const instance = Client.client.readInstanceFile(guildId);
 
-        const file = new MessageAttachment('src/resources/images/electrics/smart_switch.png');
+        const file = new MessageAttachment('/app/src/resources/images/electrics/smart_switch.png');
         const embed = module.exports.getSmartSwitchGroupEmbed(guildId, name);
         const buttons = module.exports.getSmartSwitchGroupButtons(name);
 

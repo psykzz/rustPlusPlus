@@ -34,7 +34,7 @@ class RustPlus extends RP {
 
         this.items = new Items();
 
-        this.trademarkString = 'rustPlusPlus | ';
+        this.trademarkString = 'RustPlus | ';
 
         this.oldsendTeamMessageAsync = this.sendTeamMessageAsync;
         this.sendTeamMessageAsync = async function (message) {
@@ -120,6 +120,10 @@ class RustPlus extends RP {
         let instance = Client.client.readInstanceFile(this.guildId);
         let server = `${this.server}-${this.port}`;
 
+        if (!instance.markers) {
+            instance.markers = {};
+        }
+
         if (!instance.markers.hasOwnProperty(server)) {
             instance.markers[server] = {};
             Client.client.writeInstanceFile(this.guildId, instance);
@@ -171,7 +175,7 @@ class RustPlus extends RP {
         let channel = DiscordTools.getTextChannelById(this.guildId, instance.channelId.events);
 
         if (channel !== undefined) {
-            let file = new MessageAttachment(`src/resources/images/events/${image}`);
+            let file = new MessageAttachment(`/app/src/resources/images/events/${image}`);
             let embed = new MessageEmbed()
                 .setColor('#ce412b')
                 .setThumbnail(`attachment://${image}`)
@@ -182,6 +186,16 @@ class RustPlus extends RP {
                 .setTimestamp();
 
             channel.send({ embeds: [embed], files: [file] });
+        }
+    }
+
+    sendMessage(text) {
+        let instance = Client.client.readInstanceFile(this.guildId);
+        let channel = DiscordTools.getTextChannelById(this.guildId, instance.channelId.events);
+
+        if (channel !== undefined) {
+            channel.send(text);
+            this.log(text);
         }
     }
 
