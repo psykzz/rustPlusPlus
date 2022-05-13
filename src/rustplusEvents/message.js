@@ -26,9 +26,9 @@ module.exports = {
                     message.broadcast.teamMessage.message.message.replace(
                         /^<color.+?<\/color>/g, '');
 
-                let handled = await CommandHandler.inGameCommandHandler(rustplus, client, message);
-
-                if (!handled) {
+                const handled = await CommandHandler.inGameCommandHandler(rustplus, client, message);
+                const prefixed = message.message.startsWith(instance.generalSettings.prefix);
+                if (!handled && !prefixed) {
                     TeamChatHandler(rustplus, client, message.broadcast.teamMessage.message);
                 }
             }
