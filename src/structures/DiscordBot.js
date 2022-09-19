@@ -2,7 +2,7 @@ const Fs = require('fs');
 const Discord = require('discord.js');
 const Path = require('path');
 
-const Config = require('../../config.json');
+const Config = require('../../config');
 const DiscordEmbeds = require('../discordTools/discordEmbeds.js');
 const DiscordTools = require('../discordTools/discordTools');
 const Items = require('./Items');
@@ -13,7 +13,7 @@ class DiscordBot extends Discord.Client {
     constructor(props) {
         super(props);
 
-        this.logger = new Logger(Path.join(__dirname, '..', 'logs/discordBot.log'), 'default');
+        this.logger = new Logger(Path.join(__dirname, '..', '..', 'logs/discordBot.log'), 'default');
 
         this.commands = new Discord.Collection();
         this.rustplusInstances = new Object();
@@ -29,6 +29,18 @@ class DiscordBot extends Discord.Client {
 
         this.loadDiscordCommands();
         this.loadDiscordEvents();
+        this.loadInstances();
+    }
+
+    loadInstances() {
+        this.instances = {};
+        const instancePath = Path.join(__dirname, '..', '..', 'instances');
+        const instanceFiles = Fs.readdirSync(instancePath);
+        for (const instanceFile of instanceFiles) {
+            const guildId = instanceFile.split('.')[0];
+            const instance = JSON.parse(Fs.readFileSync(Path.join(instancePath, `${guildId}.json`)), 'utf8');
+            this.instances[guildId] = instance;
+        }
     }
 
     loadDiscordCommands() {
@@ -94,19 +106,20 @@ class DiscordBot extends Discord.Client {
     }
 
     readInstanceFile(guildId) {
-        return JSON.parse(Fs.readFileSync(Path.join(__dirname, '..', `instances/${guildId}.json`), 'utf8'));
+        return this.instances[guildId];
     }
 
     writeInstanceFile(guildId, instance) {
-        Fs.writeFileSync(Path.join(__dirname, '..', `instances/${guildId}.json`), JSON.stringify(instance, null, 2));
+        this.instances[guildId] = instance;
+        Fs.writeFileSync(Path.join(__dirname, '..', '..', 'instances', `${guildId}.json`), JSON.stringify(instance, null, 2));
     }
 
     readCredentialsFile(guildId) {
-        return JSON.parse(Fs.readFileSync(Path.join(__dirname, '..', `credentials/${guildId}.json`), 'utf8'));
+        return JSON.parse(Fs.readFileSync(Path.join(__dirname, '..','..',  'credentials', `${guildId}.json`), 'utf8'));
     }
 
     writeCredentialsFile(guildId, credentials) {
-        Fs.writeFileSync(Path.join(__dirname, '..', `credentials/${guildId}.json`),
+        Fs.writeFileSync(Path.join(__dirname, '..','..',  'credentials', `${guildId}.json`),
             JSON.stringify(credentials, null, 2));
     }
 
@@ -132,7 +145,7 @@ class DiscordBot extends Discord.Client {
     }
 
     createRustplusInstancesFromConfig() {
-        let files = Fs.readdirSync(Path.join(__dirname, '..', 'instances'));
+        let files = Fs.readdirSync(Path.join(__dirname, '..', '..', 'instances'));
 
         files.forEach(file => {
             if (file.endsWith('.json')) {
