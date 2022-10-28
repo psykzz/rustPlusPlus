@@ -1,0 +1,24 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron:  '*/15 * * * *'
+    # Every 5 mins
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    name: Sync upstream
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: upstream
+
+    - uses: bdougie/Fork-Sync-With-Upstream-action@fork
+      with:
+        upstream_repository: alexemanuelol/rustPlusPlus
+        upstream_branch: master
+        target_branch: upstream                       # optional
+        github_token: ${{ secrets.GITHUB_TOKEN }}   # optional, for accessing repos that require authentication
