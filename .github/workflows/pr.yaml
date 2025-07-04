@@ -1,0 +1,97 @@
+name: Incorporate Labeled PR Changes into Staging
+
+on:
+  pull_request:
+    types:
+      - labeled # Trigger when a label is added to a PR
+
+jobs:
+  incorporate_changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to push changes to staging
+      pull-requests: write # Needed for comments (optional)
+
+    steps:
+    - name: Check for 'auto-merge' label
+      id: check_label
+      run: |
+        LABELS="${{ github.event.pull_request.labels.*.name }}"
+        if [[ "$LABELS" == *"auto-merge"* ]]; then
+          echo "::set-output name=has_label::true"
+        else
+          echo "::set-output name=has_label::false"
+        fi
+      shell: bash
+
+    - name: Configure Git
+      if: steps.check_label.outputs.has_label == 'true'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+    - name: Checkout Staging Branch
+      if: steps.check_label.outputs.has_label == 'true'
+      uses: actions/checkout@v4
+      with:
+        ref: staging # <--- **DEFINE YOUR TARGET BRANCH HERE**
+        token: ${{ secrets.GITHUB_TOKEN }} # Use GITHUB_TOKEN for pushing
+
+    - name: Merge PR branch into Staging
+      if: steps.check_label.outputs.has_label == 'true'
+      run: |
+        PR_HEAD_REF="${{ github.event.pull_request.head.ref }}"
+        PR_NUMBER="${{ github.event.pull_request.number }}"
+        PR_TITLE="${{ github.event.pull_request.title }}"
+        PR_URL="${{ github.event.pull_request.html_url }}"
+
+        echo "Attempting to merge PR branch '${PR_HEAD_REF}' (PR #${PR_NUMBER}) into 'staging'..."
+
+        # Fetch the specific PR branch
+        # We need to fetch the full ref, not just the branch name, to ensure we get the right commit
+        git fetch origin pull/${PR_NUMBER}/head:${PR_HEAD_REF}
+
+        # Attempt the merge
+        # --no-ff prevents fast-forward, always creating a merge commit
+        # -m adds a custom message
+        if git merge --no-ff "${PR_HEAD_REF}" -m "Incorporated changes from PR #${PR_NUMBER}: ${PR_TITLE}
+
+        See PR: ${PR_URL}"; then
+            echo "Successfully merged changes from '${PR_HEAD_REF}' into 'staging'."
+            git push origin staging
+            echo "Pushed changes to 'staging'."
+
+            # Optionally, add a comment to the PR
+            echo "::set-output name=merge_status::success"
+            echo "::set-output name=comment_body::🤖 Changes from this PR have been successfully incorporated into the \`staging\` branch. This PR remains open for further review or a manual merge later."
+        else
+            echo "Merge failed for '${PR_HEAD_REF}' into 'staging'."
+            git merge --abort # Abort the merge if it failed to clean up
+            echo "::set-output name=merge_status::failure"
+            echo "::set-output name=comment_body::🤖 **Warning:** Attempt to incorporate changes from this PR into the \`staging\` branch failed due to merge conflicts. Please resolve conflicts manually on \`staging\` or merge this PR directly."
+            exit 1 # Fail the step
+        fi
+      shell: bash
+
+    - name: Add comment to PR on merge status
+      if: steps.check_label.outputs.has_label == 'true'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const pull_number = context.payload.pull_request.number;
+          const mergeStatus = process.env.MERGE_STATUS;
+          const commentBody = process.env.COMMENT_BODY;
+
+          if (commentBody) {
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pull_number,
+              body: commentBody,
+            });
+            console.log(`Commented on PR #${pull_number} regarding merge status.`);
+          }
+      env:
+        MERGE_STATUS: ${{ steps.merge_pr_branch.outputs.merge_status }}
+        COMMENT_BODY: ${{ steps.merge_pr_branch.outputs.comment_body }}
