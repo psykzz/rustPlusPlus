@@ -29,39 +29,42 @@ const Utils = require('../util/utils.js');
 
 const SLEEP_TIMEOUT_MS = 2000;
 
-const RUSTLABS_ALL_ITEMS_URL = 'https://rustlabs.com/group=itemlist';
-const RUSTLABS_ITEM_URL = 'https://rustlabs.com/item/';
+const RUSTLABS_ALL_ITEMS_URL = 'https://wiki.rustclash.com/group=itemlist';
+const RUSTLABS_ITEM_URL = 'https://wiki.rustclash.com/item/';
 
-const RUSTLABS_ALL_LOOT_CONTAINERS_URL = 'https://rustlabs.com/group=containers';
-const RUSTLABS_ENTITY_URL = 'https://rustlabs.com/entity/';
+const RUSTLABS_ALL_LOOT_CONTAINERS_URL = 'https://wiki.rustclash.com/group=containers';
+const RUSTLABS_ENTITY_URL = 'https://wiki.rustclash.com/entity/';
 
-const RUSTLABS_ALL_BUILDING_BLOCKS_URL = 'https://rustlabs.com/group=building-blocks';
-const RUSTLABS_BUILDING_BLOCK_URL = 'https://rustlabs.com/building/';
+const RUSTLABS_ALL_BUILDING_BLOCKS_URL = 'https://wiki.rustclash.com/group=building-blocks';
+const RUSTLABS_BUILDING_BLOCK_URL = 'https://wiki.rustclash.com/building/';
 
-const RUSTLABS_ALL_OTHER_URL = 'https://rustlabs.com/group=else';
-const RUSTLABS_OTHER_URL = 'https://rustlabs.com/entity/';
+const RUSTLABS_ALL_OTHER_URL = 'https://wiki.rustclash.com/group=else';
+const RUSTLABS_OTHER_URL = 'https://wiki.rustclash.com/entity/';
 
 
 const RUSTLABS_ALL_ITEMS_REGEX = /<a\shref="\/item\/(.*?)"\sclass.*?img\ssrc=.*?img\/.*?\/(.*?)\.png"\salt="(.*?)"/gm
-const RUSTLABS_ITEM_RECYCLE_AREA_REGEX = /Recycler<\/a><\/td>\n^.*?$\n^.*?$\n<\/td>/gm
-const RUSTLABS_ITEM_RECYCLE_REGEX = /<a\shref.*?img\/.*?\/(.*?)\.png.*?alt="(.*?)".*?text-in-icon">(.*?)<\/span><\/a>/gm
+const RUSTLABS_ITEM_RECYCLE_AREA_REGEX = /Recycler<\/th>(\n|.)*?<\/table>/gm
+const RUSTLABS_ITEM_RECYCLE_ROW_REGEX = /<td class="left">(\n|.)*?<\/tr>/gm
+const RUSTLABS_ITEM_RECYCLE_ITEM_REGEX = /\/entity\/(.*?)"/gm
+const RUSTLABS_ITEM_RECYCLE_ITEM_EFFICIENCY_REGEX = /<td\sdata-value="(.*?)">.*?%<\/td>/gm
+const RUSTLABS_ITEM_RECYCLE_OUTPUT_ITEMS_REGEX = /<a\shref.*?img\/.*?\/(.*?)\.png.*?alt="(.*?)".*?text-in-icon">(.*?)<\/span><\/a>/gm
 
 const RUSTLABS_ITEM_CRAFT_AREA_REGEX = /data-name="craft"\sclass="tab-page(\n|.)*?<\/thead(\n|.)*?<\/tr>/gm
 const RUSTLABS_ITEM_CRAFT_INGREDIENTS_REGEX =
     /<a\shref.*?img\/.*?\/(.*?)\.png.*?alt="(.*?)".*?text-in-icon">(.*?)<\/span><\/a>/gm
-const RUSTLABS_ITEM_CRAFT_TIME_REGEX = /^<td\sdata-value="(.*?)">(.*?)<\/td>$/gm
+const RUSTLABS_ITEM_CRAFT_TIME_REGEX = /^\s*<td\sdata-value="(.*?)">(.*?)<\/td>/gm
 
 const RUSTLABS_ITEM_RESEARCH_AREA_REGEX =
     /data-name="blueprint"\sclass="tab-page(\n|.)*?<table\sclass(\n|.)*?<\/table>/gm
 const RUSTLABS_ITEM_RESEARCH_ROW_REGEX = /<td\sclass="item-cell">(\n|.)*?<\/tr>/gm
 const RUSTLABS_ITEM_RESEARCH_TYPE_REGEX =
-    /<td\sclass="item-cell">(\n|.)*?<img\sclass\ssrc="(\n|.)*?img\/(\n|.)*?\/(.*?)\.png/gm
+    /<td\sclass="item-cell">(\n|.)*?<img\sclass=""\ssrc="(\n|.)*?img\/(\n|.)*?\/(.*?)\.png/gm
 const RUSTLABS_ITEM_RESEARCH_SCRAP_REGEX = /\/scrap\.png(\n|.)*?class="text-in-icon">(.*?)<\/span>/gm
 const RUSTLABS_ITEM_RESEARCH_TOTAL_SCRAP_REGEX = /<td\sclass="no-padding"\sdata-value="(.*?)">/gm
 
 const RUSTLABS_ITEM_DURABILITY_AREA_REGEX1 = /<tr\sdata-group="(.*?)"\sdata-group2="(.*?)">(\n|.)*?<\/tr>/gm
 const RUSTLABS_ITEM_DURABILITY_AREA_REGEX2 = /<tr\sdata-group="(.*?)">(\n|.)*?<\/tr>/gm
-const RUSTLABS_ITEM_DURABILITY_TOOL_REGEX = /<img\sclass\ssrc=".*?\/img\/.*?\/(.*?)\.png"\salt="(.*?)">/gm
+const RUSTLABS_ITEM_DURABILITY_TOOL_REGEX = /<img\sclass=""\ssrc=".*?\/img\/.*?\/(.*?)\.png"\salt="(.*?)">/gm
 const RUSTLABS_ITEM_DURABILITY_CAPTION_IN_TOOL_REGEX = /caption-in-item-name">(.*?)</gm
 const RUSTLABS_ITEM_DURABILITY_QUANTITY_REGEX = /<td\sclass="no-padding"\sdata-value="(\d{1,7})">(.{1,10})<\/td>/gm
 const RUSTLABS_ITEM_DURABILITY_QUANTITY_APPROX_REGEX = /Approximate\sQuantity">(.*?)</gm
@@ -92,6 +95,10 @@ const RUSTLABS_ITEM_DECAY_REGEX3 =
 const RUSTLABS_ITEM_DECAY_REGEX4 =
     /<td>Decay\stime\soutside<\/td>(\n|.){1,3}?<td>(.*?)<\/td>(\n|.)*?<td>HP<\/td>(\n|.){1,3}?<td>(.*?)<\/td>/gm
 
+const RUSTLABS_ITEM_UPKEEP_AREA_REGEX = /<td>Upkeep<\/td>(\n|.)*?<\/tr>/gm
+const RUSTLABS_ITEM_UPKEEP_REGEX =
+    /img\ssrc=".*?\/img\/.*?\/(.*?)\.png"\salt="(.*?)"(\n|.)*?class="icon-in-text">(.*?)</gm
+
 const RUSTLABS_ALL_BUILDING_BLOCKS_REGEX = /\/building\/(.*?)">(.*?)</gm
 
 const RUSTLABS_ALL_OTHER_REGEX = /\/entity\/(.*?)">(.*?)</gm
@@ -119,6 +126,10 @@ const rustlabsDecayData = new Object();
 rustlabsDecayData['items'] = new Object();
 rustlabsDecayData['buildingBlocks'] = new Object();
 rustlabsDecayData['other'] = new Object();
+const rustlabsUpkeepData = new Object();
+rustlabsUpkeepData['items'] = new Object();
+rustlabsUpkeepData['buildingBlocks'] = new Object();
+rustlabsUpkeepData['other'] = new Object();
 
 async function scrape(url) {
     try {
@@ -229,6 +240,7 @@ async function processAllItems() {
         processItemDespawn(rustlabsName, shortname, name, data);
         processItemStack(rustlabsName, shortname, name, data);
         processItemDecay(rustlabsName, shortname, name, data);
+        processItemUpkeep(rustlabsName, shortname, name, data);
 
         await sleep(SLEEP_TIMEOUT_MS);
     }
@@ -275,6 +287,7 @@ async function processAllBuildingBlocks() {
 
         processItemDurability(rustlabsName, null, name, data, 'buildingBlocks');
         processItemDecay(rustlabsName, null, name, data, 'buildingBlocks');
+        processItemUpkeep(rustlabsName, null, name, data, 'buildingBlocks');
 
         await sleep(SLEEP_TIMEOUT_MS);
     }
@@ -318,6 +331,7 @@ async function processAllOther() {
 
         processItemDurability(rustlabsName, null, name, data, 'other');
         processItemDecay(rustlabsName, null, name, data, 'other');
+        processItemUpkeep(rustlabsName, null, name, data, 'other');
 
         await sleep(SLEEP_TIMEOUT_MS);
     }
@@ -458,39 +472,72 @@ function processItemRecycle(rustlabsName, shortname, name, data) {
     }
     data = data[0];
 
-    const matches = data.matchAll(RUSTLABS_ITEM_RECYCLE_REGEX);
-    const recycleItems = [];
+    const recycleData = new Object();
+    recycleData['recycler'] = new Object();
+    recycleData['recycler']['efficiency'] = null;
+    recycleData['recycler']['yield'] = [];
+    recycleData['shredder'] = new Object();
+    recycleData['shredder']['efficiency'] = null;
+    recycleData['shredder']['yield'] = [];
+    recycleData['safe-zone-recycler'] = new Object();
+    recycleData['safe-zone-recycler']['efficiency'] = null;
+    recycleData['safe-zone-recycler']['yield'] = [];
 
-    for (const match of matches) {
-        if (match.length !== 4) exit();
+    const rows = data.matchAll(RUSTLABS_ITEM_RECYCLE_ROW_REGEX);
+    for (const row of rows) {
+        if (row.length !== 2) exit();
+        const rowData = row[0];
 
-        const shortnameSub = match[1];
-        const nameSub = Utils.decodeHtml(match[2]);
-        let quantity = match[3];
-        const id = Object.keys(ITEMS).find(e => ITEMS[e].shortname === shortnameSub && ITEMS[e].name === nameSub);
-        if (id === undefined) exit();
-
-        let probability = 1;
-        if (quantity === '') {
-            quantity = 1;
+        let recyclerType = null;
+        const recyclerMatches = rowData.matchAll(RUSTLABS_ITEM_RECYCLE_ITEM_REGEX);
+        for (const match of recyclerMatches) {
+            if (match.length !== 2) exit();
+            recyclerType = match[1];
+            break;
         }
-        else {
-            quantity = quantity.replace('×', '').replace(/,/g, '');
+        if (recyclerType === null) exit();
 
-            if (quantity.includes('%')) {
-                probability = `0.${quantity.replace('%', '')}`;
+        let efficiency = null;
+        const efficiencyMatches = rowData.matchAll(RUSTLABS_ITEM_RECYCLE_ITEM_EFFICIENCY_REGEX);
+        for (const match of efficiencyMatches) {
+            if (match.length !== 2) exit();
+            efficiency = match[1];
+            break;
+        }
+        recycleData[recyclerType]['efficiency'] = efficiency;
+
+        const matches = rowData.matchAll(RUSTLABS_ITEM_RECYCLE_OUTPUT_ITEMS_REGEX);
+        for (const match of matches) {
+            if (match.length !== 4) exit();
+
+            const shortnameSub = match[1];
+            const nameSub = Utils.decodeHtml(match[2]);
+            let quantity = match[3];
+            const id = Object.keys(ITEMS).find(e => ITEMS[e].shortname === shortnameSub && ITEMS[e].name === nameSub);
+            if (id === undefined) exit();
+
+            let probability = 1;
+            if (quantity === '') {
                 quantity = 1;
             }
-        }
+            else {
+                quantity = quantity.replace('×', '').replace(/,/g, '');
 
-        recycleItems.push({
-            id: id,
-            probability: parseFloat(probability),
-            quantity: parseFloat(quantity)
-        });
+                if (quantity.includes('%')) {
+                    probability = `0.${quantity.replace('%', '')}`;
+                    quantity = 1;
+                }
+            }
+
+            recycleData[recyclerType]['yield'].push({
+                id: id,
+                probability: parseFloat(probability),
+                quantity: parseFloat(quantity)
+            });
+        }
     }
 
-    rustlabsRecycleData[itemId] = recycleItems;
+    rustlabsRecycleData[itemId] = recycleData;
 }
 
 function processItemDurability(rustlabsName, shortname, name, data, type = 'items') {
@@ -540,8 +587,8 @@ function processItemDurability(rustlabsName, shortname, name, data, type = 'item
         if (toolMatches.length !== 0) {
             for (const toolMatch of toolMatches) {
                 if (toolMatch.length !== 3) exit();
-                toolShortname = toolMatch[1];
-                toolName = toolMatch[2];
+                toolShortname = Utils.decodeHtml(toolMatch[1]).replace('%20', ' ');
+                toolName = Utils.decodeHtml(toolMatch[2]).replace('%20', ' ');
                 break;
             }
         }
@@ -595,13 +642,13 @@ function processItemDurability(rustlabsName, shortname, name, data, type = 'item
             }
         }
         if (quantity === null) exit();
+
         let quantityTypeId = null;
         if (quantityTypeShortname !== null && quantityTypeName !== null) {
             quantityTypeId = Object.keys(ITEMS).find(e =>
                 ITEMS[e].shortname === quantityTypeShortname && ITEMS[e].name === quantityTypeName);
             if (!quantityTypeId) exit();
         }
-
 
         /* Time */
         let timeString = null, time = null;
@@ -926,6 +973,54 @@ function processItemDecay(rustlabsName, shortname, name, data, type = 'items') {
     };
 }
 
+function processItemUpkeep(rustlabsName, shortname, name, data, type = 'items') {
+    let itemId = null;
+    if (type === 'items') {
+        itemId = Object.keys(ITEMS).find(e => ITEMS[e].shortname === shortname && ITEMS[e].name === name);
+    }
+    else if (type === 'buildingBlocks' || type === 'other') {
+        itemId = name;
+    }
+    if (!itemId) return;
+
+    data = data.match(RUSTLABS_ITEM_UPKEEP_AREA_REGEX);
+    if (data === null || data.length !== 1) {
+        console.log('  - No upkeep data found.');
+        return;
+    }
+    data = data[0];
+
+    let matches = [...data.matchAll(RUSTLABS_ITEM_UPKEEP_REGEX)];
+    if (matches.length === 0) {
+        console.log('  - No upkeep data found.');
+        return;
+    }
+
+    const content = [];
+    for (const match of matches) {
+        if (match.length !== 5) {
+            console.log('  - No upkeep data found.');
+            return;
+        }
+
+        const upkeepItemShortname = match[1];
+        const upkeepItemName = Utils.decodeHtml(match[2]);
+        const upkeepQuantity = match[4];
+
+        const upkeepItemId = Object.keys(ITEMS).find(e =>
+            ITEMS[e].shortname === upkeepItemShortname && ITEMS[e].name === upkeepItemName);
+
+        if (!upkeepItemId) return;
+
+        content.push({
+            id: upkeepItemId,
+            quantity: upkeepQuantity
+        });
+    }
+
+    rustlabsUpkeepData[type][itemId] = content;
+}
+
 async function main() {
     await processAll();
 
@@ -941,6 +1036,7 @@ async function main() {
     Fs.writeFileSync(`${__dirname}/rustlabsDespawnData.json`, JSON.stringify(rustlabsDespawnData, null, 2));
     Fs.writeFileSync(`${__dirname}/rustlabsStackData.json`, JSON.stringify(rustlabsStackData, null, 2));
     Fs.writeFileSync(`${__dirname}/rustlabsDecayData.json`, JSON.stringify(rustlabsDecayData, null, 2));
+    Fs.writeFileSync(`${__dirname}/rustlabsUpkeepData.json`, JSON.stringify(rustlabsUpkeepData, null, 2));
 }
 
 main();

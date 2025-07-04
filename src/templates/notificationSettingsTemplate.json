@@ -17,6 +17,12 @@
         "inGame": false,
         "voice": true
     },
+    "cargoShipDockingAtHarborSetting": {
+        "image": "cargoship_logo.png",
+        "discord": true,
+        "inGame": false,
+        "voice": true
+    },
     "patrolHelicopterDetectedSetting": {
         "image": "patrol_helicopter_logo.png",
         "discord": true,
@@ -49,6 +55,24 @@
     },
     "chinook47DetectedSetting": {
         "image": "chinook_47_logo.png",
+        "discord": true,
+        "inGame": false,
+        "voice": true
+    },
+    "travelingVendorDetectedSetting": {
+        "image": "traveling_vendor_logo.png",
+        "discord": true,
+        "inGame": false,
+        "voice": true
+    },
+    "travelingVendorHaltedSetting": {
+        "image": "traveling_vendor_logo.png",
+        "discord": true,
+        "inGame": false,
+        "voice": true
+    },
+    "travelingVendorLeftSetting": {
+        "image": "traveling_vendor_logo.png", 
         "discord": true,
         "inGame": false,
         "voice": true
