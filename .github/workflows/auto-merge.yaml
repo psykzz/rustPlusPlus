@@ -1,0 +1,159 @@
+name: Continuous Staging Consolidation
+
+on:
+  push:
+    branches:
+      - '**' # Trigger on push to ANY branch
+      - '!staging' # EXCLUDE the staging branch itself to prevent infinite loops
+  pull_request:
+    types:
+      - labeled   # Trigger when a label is added (for new PRs)
+      - unlabeled # Trigger when a label is removed (to remove from staging)
+      - opened    # Trigger when a PR is opened (in case it already has the label)
+      - synchronize # Trigger when new commits are pushed to an open PR (to update staging)
+      - reopened  # Trigger if a closed PR with the label is reopened
+
+# Ensure only one instance of this workflow runs at a time for this group.
+# This is crucial to prevent race conditions when force-pushing to 'staging'.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/staging' && 'staging-update' || 'other-branches' }}
+  cancel-in-progress: true
+
+jobs:
+  consolidate_staging:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Needed to push changes to staging
+      pull-requests: write # Needed to read PRs and add comments
+      issues: write # Needed to add comments to PRs (they are issues too)
+
+    steps:
+    - name: Set up Git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+    - name: Checkout Base Branch (main)
+      uses: actions/checkout@v4
+      with:
+        ref: master # <--- Your base/stable branch (e.g., master, main)
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0 # Fetch all history for cleaner merges if needed
+
+    - name: Create/Reset Staging Branch from Base
+      id: reset_staging
+      run: |
+        BASE_BRANCH="master"    # <--- Your base/stable branch
+        STAGING_BRANCH="staging" # <--- Your target staging branch
+
+        echo "Creating or resetting ${STAGING_BRANCH} branch from ${BASE_BRANCH}..."
+        git checkout -B "$STAGING_BRANCH" "$BASE_BRANCH"
+
+        # Check if the staging branch exists remotely. If not, create it.
+        # If it exists, force push to overwrite it.
+        if ! git ls-remote --exit-code origin "$STAGING_BRANCH"; then
+          echo "Remote branch ${STAGING_BRANCH} does not exist, pushing for the first time."
+          git push origin "$STAGING_BRANCH"
+        else
+          echo "Remote branch ${STAGING_BRANCH} exists, force pushing."
+          git push origin "$STAGING_BRANCH" --force
+        fi
+        echo "Successfully reset ${STAGING_BRANCH} to ${BASE_BRANCH}."
+        
+        # Set outputs using GITHUB_OUTPUT environment file
+        echo "staging_branch=$STAGING_BRANCH" >> $GITHUB_OUTPUT
+        echo "base_branch=$BASE_BRANCH" >> $GITHUB_OUTPUT
+
+    - name: Find and Merge Labeled PRs
+      id: merge_prs
+      uses: actions/github-script@v6
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        script: |
+          const { owner, repo } = context.repo;
+          const baseBranch = '${{ steps.reset_staging.outputs.base_branch }}';
+          const stagingBranch = '${{ steps.reset_staging.outputs.staging_branch }}';
+
+          console.log(`Searching for open PRs with 'auto-merge' label targeting '${baseBranch}'...`);
+
+          const { data: pullRequests } = await github.rest.pulls.list({
+            owner,
+            repo,
+            state: 'open',
+            base: baseBranch, // Filter by PRs targeting the base branch
+            per_page: 100, // Adjust as needed, max 100 per API call
+          });
+
+          const prsToMerge = pullRequests.filter(pr =>
+            pr.labels.some(label => label.name === 'auto-merge')
+          );
+
+          if (prsToMerge.length === 0) {
+            console.log(`No open PRs found with 'auto-merge' label targeting '${baseBranch}'.`);
+            return; // Exit script
+          }
+
+          console.log(`Found ${prsToMerge.length} PR(s) to merge into ${stagingBranch}:`);
+          for (const pr of prsToMerge) {
+            console.log(`  - #${pr.number}: ${pr.title} (from ${pr.head.ref})`);
+          }
+
+          let mergedPrs = [];
+          let failedPrs = [];
+          let mergeConflictDetected = false;
+
+          for (const pr of prsToMerge) {
+            try {
+              console.log(`Attempting to merge PR #${pr.number} (${pr.head.ref}) into ${stagingBranch}...`);
+
+              // Fetch the PR's head ref
+              await exec.exec(`git fetch origin pull/${pr.number}/head:${pr.head.ref}`);
+
+              // Attempt the merge
+              // --no-ff ensures a merge commit is always created
+              // -m provides a custom commit message
+              const mergeCommand = `git merge --no-ff ${pr.head.ref} -m "Consolidate PR #${pr.number}: ${pr.title}\n\nSee PR: ${pr.html_url}"`;
+              await exec.exec(mergeCommand);
+
+              console.log(`Successfully merged PR #${pr.number}.`);
+              mergedPrs.push(pr.number);
+
+              // Add a comment to the PR
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: `🤖 Changes from this PR have been successfully consolidated into the \`${stagingBranch}\` branch by the continuous staging workflow.`,
+              });
+
+            } catch (error) {
+              console.error(`Failed to merge PR #${pr.number}: ${error.message}`);
+              failedPrs.push({ number: pr.number, error: error.message });
+              mergeConflictDetected = true;
+
+              // Abort the merge to clean up local state
+              await exec.exec(`git merge --abort || true`); // '|| true' to prevent script failure if no merge in progress
+
+              // Add a failure comment to the PR
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr.number,
+                body: `🤖 **Warning:** Consolidation of this PR into the \`${stagingBranch}\` branch failed due to merge conflicts. Please resolve conflicts or merge manually. Error: \`${error.message}\``,
+              });
+            }
+          }
+
+          if (mergedPrs.length > 0) {
+            console.log(`All successful merges completed. Pushing ${stagingBranch} to origin...`);
+            await exec.exec(`git push origin ${stagingBranch}`);
+            console.log("Push successful.");
+          } else {
+            console.log("No new PRs were successfully merged, no push required to staging.");
+          }
+
+          if (mergeConflictDetected) {
+            core.setFailed("One or more PRs failed to merge due to conflicts. Check logs for details and the PR comments.");
+          }
+
